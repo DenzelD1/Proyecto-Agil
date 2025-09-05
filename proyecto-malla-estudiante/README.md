@@ -2,6 +2,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+# IMPORTANTE
+```bash
+npm install
+# ESCRIBAN ESTE COMANDO CADA VEZ QUE CARGUEN EL PROYECTO PARA COMPROBAR SI HAY NUEVAS DEPENDENCIAS,
+# YA QUE, SI NO SE HACE ES POSIBLE QUE NO TE FUNCIONEN ALGUNAS COSAS PORQUE NO ESTÁN INSTALADAS
+```
+
+# COMANDOS PARA EJECUTAR
 First, run the development server:
 
 ```bash
@@ -14,7 +22,7 @@ pnpm dev
 bun dev
 ```
 
-COMANDOS PARA LEVANTAR DOCKER E INICIAR PRISMA
+# COMANDOS PARA LEVANTAR DOCKER E INICIAR PRISMA
 ```bash
 # 1. Instalar dependencias
 npm install
@@ -29,7 +37,7 @@ npx prisma migrate deploy
 npx prisma generate
 ```
 
-COMANDOS DE DOCKER
+# COMANDOS DE DOCKER
 ```bash
 docker-compose up -d
 #¿Para qué sirve? Levanta el contenedor de PostgreSQL en segundo plano
@@ -52,7 +60,7 @@ docker-compose restart
 #¿Qué hace? Reinicia PostgreSQL manteniendo los datos
 ```
 
-COMANDOS DE PRISMA
+# COMANDOS DE PRISMA
 ```bash
 npx prisma db push
 #¿Para qué sirve? Aplica cambios del schema directamente a la base de datos
