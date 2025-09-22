@@ -6,15 +6,34 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { MensajeError } from "@/components/ui/mensaje-error"
 import { UserIcon, LockIcon, GraduationCapIcon } from "@/components/ui/icons"
+import { validarFormularioLogin, tieneErrores, type ErroresValidacion } from "@/lib/validaciones"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [contraseña, setContraseña] = useState("")
+  const [errores, setErrores] = useState<ErroresValidacion>({})
+  const [estaEnviando, setEstaEnviando] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Login attempt:", { email, password })
+    
+    setErrores({})
+    
+    const erroresValidacion = validarFormularioLogin(email, contraseña)
+    
+    if (tieneErrores(erroresValidacion)) {
+      setErrores(erroresValidacion)
+      return
+    }
+
+    setEstaEnviando(true)
+    console.log("Login attempt:", { email, contraseña })
+    
+    setTimeout(() => {
+      setEstaEnviando(false)
+    }, 1000)
   }
 
   return (
@@ -64,37 +83,52 @@ export default function LoginForm() {
                   placeholder="usuario@alumnos.ucn.cl"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-white border-slate-300 focus:border-slate-500 focus:ring-slate-500"
-                  required
+                  className={`pl-10 bg-white focus:ring-slate-500 ${
+                    errores.email 
+                      ? "border-red-500 focus:border-red-500" 
+                      : "border-slate-300 focus:border-slate-500"
+                  }`}
                 />
               </div>
+              <MensajeError mensaje={errores.email} />
             </div>
 
             {/* Campo Contraseña */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 font-medium">
+              <Label htmlFor="contraseña" className="text-slate-700 font-medium">
                 Contraseña
               </Label>
               <div className="relative">
                 <LockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500" />
                 <Input
-                  id="password"
+                  id="contraseña"
                   type="password"
                   placeholder="********"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 bg-white border-slate-300 focus:border-slate-500 focus:ring-slate-500"
-                  required
+                  value={contraseña}
+                  onChange={(e) => setContraseña(e.target.value)}
+                  className={`pl-10 bg-white focus:ring-slate-500 ${
+                    errores.contraseña 
+                      ? "border-red-500 focus:border-red-500" 
+                      : "border-slate-300 focus:border-slate-500"
+                  }`}
                 />
               </div>
+              <MensajeError mensaje={errores.contraseña} />
             </div>
+
+            {errores.general && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <MensajeError mensaje={errores.general} />
+              </div>
+            )}
 
             {/* Botón de login */}
             <Button
               type="submit"
-              className="w-full bg-slate-700 hover:bg-slate-800 text-white font-medium py-2.5"
+              disabled={estaEnviando}
+              className="w-full bg-slate-700 hover:bg-slate-800 disabled:bg-slate-400 text-white font-medium py-2.5"
             >
-              Iniciar Sesión
+              {estaEnviando ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
           </form>
         </CardContent>
