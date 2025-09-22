@@ -8,10 +8,77 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Modelos principales
+
 model User {
+  id              Int               @id @default(autoincrement())
+  email           String            @unique
+  name            String?
+  careerId        Int
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  career          Career            @relation(fields: [careerId], references: [id])
+  academicHistory AcademicHistory[] // Relación con el historial académico del usuario
+  projections     Projection[]      // Relación con las proyecciones del usuario
+}
+
+model Career {
+  id      Int       @id @default(autoincrement())
+  name    String    @unique
+  users   User[]    // Relación con los usuarios que pertenecen a la carrera
+  subjects Subject[] // Relación con las asignaturas de la carrera
+}
+
+model Subject {
+  id            Int            @id @default(autoincrement())
+  name          String
+  code          String         @unique
+  semester      Int            // Semestre en que se imparte la asignatura
+  careerId      Int
+  
+  career        Career         @relation(fields: [careerId], references: [id])
+  prerequisites Prerequisite[] @relation("SubjectPrerequisites") // Asignaturas que son prerrequisito para esta
+  requiredFor   Prerequisite[] @relation("RequiredFor") // Asignaturas para las que esta es prerrequisito
+  academicHistories AcademicHistory[]
+  projections   Projection[]
+}
+
+// Modelo de unión para la relación de prerrequisitos
+model Prerequisite {
+  id             Int     @id @default(autoincrement())
+  subjectId      Int
+  prerequisiteId Int
+  
+  subject        Subject @relation("RequiredFor", fields: [subjectId], references: [id])
+  prerequisite   Subject @relation("SubjectPrerequisites", fields: [prerequisiteId], references: [id])
+
+  @@unique([subjectId, prerequisiteId])
+}
+
+// Modelos para historial y proyección académica
+
+model AcademicHistory {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  userId    Int
+  subjectId Int
+  status    String   // Por ejemplo: "aprobada", "reprobada", "inscrita"
+  grade     Float?   // Nota numérica
+  
+  user      User     @relation(fields: [userId], references: [id])
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+
+  @@unique([userId, subjectId])
+}
+
+model Projection {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  subjectId Int
+  semester  Int      // Semestre futuro en el que se planea tomar la asignatura (ej: 1, 2, 3...)
+  
+  user      User     @relation(fields: [userId], references: [id])
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+
+  @@unique([userId, subjectId, semester])
 }
