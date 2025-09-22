@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MensajeError } from "@/components/ui/mensaje-error"
 import { UserIcon, LockIcon, GraduationCapIcon } from "@/components/ui/icons"
 import { validarFormularioLogin, tieneErrores, type ErroresValidacion } from "@/lib/validaciones"
+import { iniciarSesion } from "@/lib/servicio-auth"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
@@ -16,7 +17,7 @@ export default function LoginForm() {
   const [errores, setErrores] = useState<ErroresValidacion>({})
   const [estaEnviando, setEstaEnviando] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     setErrores({})
@@ -29,11 +30,26 @@ export default function LoginForm() {
     }
 
     setEstaEnviando(true)
-    console.log("Login attempt:", { email, contraseña })
     
-    setTimeout(() => {
+    try {
+      const resultado = await iniciarSesion(email, contraseña)
+      
+      if (resultado.success && resultado.usuario) {
+        console.log("Login exitoso:", resultado.usuario)
+        alert(`Inicio de sesión exitoso. RUT estudiante: ${resultado.usuario.rut}`)
+      } else {
+        setErrores({
+          general: resultado.error || 'Error al iniciar sesión'
+        })
+      }
+    } catch (error) {
+      console.error('Error en el login:', error)
+      setErrores({
+        general: 'Error de conexión. Intente nuevamente.'
+      })
+    } finally {
       setEstaEnviando(false)
-    }, 1000)
+    }
   }
 
   return (
