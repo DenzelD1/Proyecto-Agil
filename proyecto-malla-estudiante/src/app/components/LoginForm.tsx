@@ -9,9 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MensajeError } from "@/components/ui/mensaje-error"
 import { UserIcon, LockIcon, GraduationCapIcon } from "@/components/ui/icons"
 import { validarFormularioLogin, tieneErrores, type ErroresValidacion } from "@/lib/validaciones"
-import { iniciarSesion } from "@/lib/servicio-auth"
+import { iniciarSesion, guardarSesion } from "@/lib/servicio-auth"
+import { useRouter } from "next/navigation"
 
 export default function LoginForm() {
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [contraseña, setContraseña] = useState("")
   const [errores, setErrores] = useState<ErroresValidacion>({})
@@ -35,8 +37,8 @@ export default function LoginForm() {
       const resultado = await iniciarSesion(email, contraseña)
       
       if (resultado.success && resultado.usuario) {
-        console.log("Login exitoso:", resultado.usuario)
-        alert(`Inicio de sesión exitoso. RUT estudiante: ${resultado.usuario.rut}`)
+        guardarSesion(resultado.usuario)
+        router.push("/principal")
       } else {
         setErrores({
           general: resultado.error || 'Error al iniciar sesión'
