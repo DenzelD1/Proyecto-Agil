@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import BarraSuperior from "@/components/BarraSuperior"
 import NavMallas from "@/components/NavMallas"
+import Breadcrumb from "@/components/Breadcrumb"
 import { leerSesion } from "@/lib/servicio-auth"
 import { AsignaturaMalla, MallaCarrera } from "@/types/malla"
 import TarjetaAsignatura from "@/components/TarjetaAsignatura"
@@ -60,6 +61,7 @@ export default function MallaCurricularPage() {
     <div className="min-h-screen bg-slate-50">
       <BarraSuperior />
       <NavMallas />
+      <Breadcrumb />
       <main className="max-w-6xl mx-auto px-4 py-8">
         {cargando && (
           <div className="rounded-lg border border-slate-200 bg-white p-6">Cargando malla...</div>

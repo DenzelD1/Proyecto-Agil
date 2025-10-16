@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 const enlaces = [
+  { href: "/principal", titulo: "Inicio", icono: "🏠" },
   { href: "/principal/cuenta", titulo: "Mi Cuenta", icono: "👤" },
   { href: "/principal/malla-curricular", titulo: "Malla Curricular", icono: "📚" },
   { href: "/principal/malla-temporal", titulo: "Malla Temporal", icono: "📅" },

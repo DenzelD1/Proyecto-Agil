@@ -2,6 +2,7 @@
 
 import BarraSuperior from "@/components/BarraSuperior"
 import NavMallas from "@/components/NavMallas"
+import Breadcrumb from "@/components/Breadcrumb"
 import { leerSesion } from "@/lib/servicio-auth"
 import { useEffect, useState } from "react"
 
@@ -28,6 +29,7 @@ export default function CuentaPage() {
     <div className="min-h-screen bg-slate-50">
       <BarraSuperior />
       <NavMallas />
+      <Breadcrumb />
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 bg-white p-6">
