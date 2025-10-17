@@ -19,7 +19,7 @@ export default function PrincipalPage() {
   const tarjetas = [
     {
       titulo: "Mi Cuenta",
-      descripcion: "Gestiona tu información personal y configuración",
+      descripcion: "Revisa tus datos personales y resumen académico",
       icono: "👤",
       href: "/principal/cuenta",
       color: "bg-blue-50 border-blue-200 text-blue-800"
@@ -109,7 +109,7 @@ export default function PrincipalPage() {
                 href="/principal/cuenta" 
                 className="block w-full text-left px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
               >
-                Actualizar mi perfil
+                Ver datos personales y resumen académico
               </Link>
             </div>
           </div>
