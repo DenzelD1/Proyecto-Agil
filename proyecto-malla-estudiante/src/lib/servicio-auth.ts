@@ -61,6 +61,19 @@ export function guardarSesion(usuario: Usuario): void {
   localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion))
 }
 
+export function guardarCredencialesTemporales(email: string, contraseña: string): void {
+  if (typeof window === 'undefined') return
+  // Solo guardar si el email no contiene un RUT válido (para obtener RUT después)
+  const emailPart = email.split('@')[0]
+  if (!/^\d{7,8}-?[\dk]$/i.test(emailPart)) {
+    localStorage.setItem('email', email)
+    localStorage.setItem('password', contraseña) // Temporal para obtener RUT
+  } else {
+    localStorage.setItem('email', email)
+    // No necesitamos guardar contraseña si el email ya tiene RUT
+  }
+}
+
 export function leerSesion(): Sesion | null {
   if (typeof window === 'undefined') return null
   const texto = localStorage.getItem(CLAVE_SESION)

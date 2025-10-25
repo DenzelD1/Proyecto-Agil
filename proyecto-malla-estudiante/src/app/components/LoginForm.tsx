@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MensajeError } from "@/components/ui/mensaje-error"
 import { UserIcon, LockIcon, GraduationCapIcon } from "@/components/ui/icons"
 import { validarFormularioLogin, tieneErrores, type ErroresValidacion } from "@/lib/validaciones"
-import { iniciarSesion, guardarSesion } from "@/lib/servicio-auth"
+import { iniciarSesion, guardarSesion, guardarCredencialesTemporales } from "@/lib/servicio-auth"
 import { useRouter } from "next/navigation"
 
 export default function LoginForm() {
@@ -38,6 +38,7 @@ export default function LoginForm() {
       
       if (resultado.success && resultado.usuario) {
         guardarSesion(resultado.usuario)
+        guardarCredencialesTemporales(email, contraseña) // Para obtener RUT después
         router.push("/principal")
       } else {
         setErrores({
