@@ -281,11 +281,23 @@ async function obtenerRamosCursados(rut: string, codCarrera?: string, catalogo?:
     
     let mallaData: any[] = []
     
-    if (codCarrera) {
+    const carrerasAConsultar = [
+      { codigo: codCarrera, catalogo: catalogo || '202410' }, // Carrera actual
+      { codigo: '8266', catalogo: '202410' }, // ITI actual
+      { codigo: '8606', catalogo: '201610' }, // ICCI anterior
+      { codigo: '8616', catalogo: '201610' }, // ICI anterior
+    ]
+
+    const carrerasUnicas = carrerasAConsultar.filter((carrera, index, self) => 
+      index === self.findIndex(c => c.codigo === carrera.codigo && c.catalogo === carrera.catalogo)
+    )
+
+    console.log('📚 [Ramos] Consultando múltiples mallas curriculares:', carrerasUnicas.length)
+
+    for (const carrera of carrerasUnicas) {
       try {
-        const cat = catalogo || '202410'
-        const mallaUrl = `https://losvilos.ucn.cl/hawaii/api/mallas?${codCarrera}-${cat}`
-        console.log('📚 [Ramos] Consultando malla curricular en:', mallaUrl)
+        const mallaUrl = `https://losvilos.ucn.cl/hawaii/api/mallas?${carrera.codigo}-${carrera.catalogo}`
+        console.log('📚 [Ramos] Consultando malla:', mallaUrl)
         
         const mallaResponse = await fetch(mallaUrl, {
           headers: {
@@ -296,22 +308,40 @@ async function obtenerRamosCursados(rut: string, codCarrera?: string, catalogo?:
         })
         
         if (mallaResponse.ok) {
-          mallaData = await mallaResponse.json()
-          console.log('📚 [Ramos] Datos de malla curricular obtenidos:', mallaData.length, 'asignaturas')
+          const datosMalla = await mallaResponse.json()
+          if (Array.isArray(datosMalla) && datosMalla.length > 0) {
+            mallaData = mallaData.concat(datosMalla)
+            console.log(`📚 [Ramos] Malla ${carrera.codigo}-${carrera.catalogo}: ${datosMalla.length} asignaturas`)
+          }
         } else {
-          console.log('⚠️ [Ramos] No se pudo obtener malla curricular, se usará valor por defecto')
+          console.log(`⚠️ [Ramos] No se pudo obtener malla ${carrera.codigo}-${carrera.catalogo}`)
         }
       } catch (e) {
-        console.log('⚠️ [Ramos] Error obteniendo malla curricular, se usará valor por defecto')
+        console.log(`⚠️ [Ramos] Error obteniendo malla ${carrera.codigo}-${carrera.catalogo}`)
       }
     }
+
+    console.log('📚 [Ramos] Total de asignaturas obtenidas de todas las mallas:', mallaData.length)
     
     const creditosPorCodigo = new Map<string, number>()
+    const nombresPorCodigo = new Map<string, string>()
+    
     for (const asignatura of mallaData) {
-      if (asignatura.codigo && asignatura.creditos) {
-        creditosPorCodigo.set(asignatura.codigo, asignatura.creditos)
+      if (asignatura.codigo) {
+        if (asignatura.creditos) {
+          creditosPorCodigo.set(asignatura.codigo, asignatura.creditos)
+        }
+        
+        const nombre = asignatura.asignatura || asignatura.nombre || asignatura.materia
+        if (nombre && nombre.trim() !== '') {
+          nombresPorCodigo.set(asignatura.codigo, nombre.trim())
+        }
       }
     }
+
+    console.log('📊 [Ramos] Mapeo creado:')
+    console.log('  - Créditos mapeados:', creditosPorCodigo.size)
+    console.log('  - Nombres mapeados:', nombresPorCodigo.size)
     
     const ramosTransformados: RamoMalla[] = []
     const ramosPorCodigo = new Map<string, RamoMalla>()
@@ -319,6 +349,7 @@ async function obtenerRamosCursados(rut: string, codCarrera?: string, catalogo?:
     for (const registro of data) {
       const codigo = registro.course
       const creditos = creditosPorCodigo.get(codigo) || 0
+      const nombre = nombresPorCodigo.get(codigo) || codigo
       
       const { año, semestre, periodoMostrar } = parsearPeriodo(registro.period)
       
@@ -335,7 +366,7 @@ async function obtenerRamosCursados(rut: string, codCarrera?: string, catalogo?:
       
       if (!ramosPorCodigo.has(codigo)) {
         const asignaturaMalla = mallaData.find(a => a.codigo === codigo)
-        const nombre = asignaturaMalla?.asignatura || asignaturaMalla?.nombre || codigo
+        const prerrequisitos = asignaturaMalla?.prereq ? asignaturaMalla.prereq.split(',').map((p: string) => p.trim()) : []
         
         const nuevoRamo: RamoMalla = {
           id: codigo,
@@ -344,12 +375,14 @@ async function obtenerRamosCursados(rut: string, codCarrera?: string, catalogo?:
           creditos: creditos,
           semestre: año, 
           estado: estado,
-          prerrequisitos: asignaturaMalla?.prereq ? asignaturaMalla.prereq.split(',').map((p: string) => p.trim()) : [],
+          prerrequisitos: prerrequisitos,
           periodo: periodoMostrar
         }
         
         ramosPorCodigo.set(codigo, nuevoRamo)
         ramosTransformados.push(nuevoRamo)
+        
+        console.log(`📝 [Ramos] Ramo procesado: ${codigo} - ${nombre} (${creditos} créditos)`)
       }
     }
     
