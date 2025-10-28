@@ -42,6 +42,7 @@ interface EstudianteMalla {
 
 interface SemestreMalla {
   numero: number
+  periodo?: string
   ramos: Ramo[]
   creditosTotal: number
   creditosAprobados: number
@@ -72,6 +73,7 @@ interface EstudianteMalla {
 
 interface SemestreMalla {
   numero: number
+  periodo?: string
   ramos: RamoMalla[]
   creditosTotal: number
   creditosAprobados: number
@@ -394,7 +396,7 @@ export default function MallaTemporalPage() {
                 <div key={semestre.numero} className="bg-slate-50 rounded-lg p-6">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold text-slate-800">
-                      📚 Semestre {semestre.numero}
+                      📚 {semestre.periodo || `Semestre ${semestre.numero}`}
                     </h2>
                     <div className="flex space-x-4 text-sm text-slate-600">
                       <span>

@@ -23,6 +23,7 @@ interface MallaTemporal {
   }
   semestres: {
     numero: number
+    periodo?: string
     ramos: RamoMalla[]
     creditosTotal: number
     creditosAprobados: number
@@ -32,6 +33,10 @@ interface MallaTemporal {
     creditosAprobados: number
     porcentajeAvance: number
     semestreActual: number
+    totalRamos?: number
+    ramosAprobados?: number
+    ramosCursando?: number
+    ramosReprobados?: number
   }
 }
 
@@ -74,11 +79,21 @@ export async function GET(request: NextRequest) {
     // 2. Obtener datos del estudiante y su carrera
     const datosEstudiante = await obtenerDatosEstudiante(email, password || undefined)
     
-    // 3. Obtener ramos cursados/aprobados
-    const ramosCursados = await obtenerRamosCursados(rut)
+    // Obtener código de carrera y catálogo
+    const codigoCarrera = datosEstudiante?.carreras?.[0]?.codigo
+    const catalogo = datosEstudiante?.carreras?.[0]?.catalogo
     
-    // 4. Obtener malla curricular de la carrera
-    const mallaCurricular = await obtenerMallaCurricular(datosEstudiante?.carreras?.[0]?.codigo)
+    if (!codigoCarrera) {
+      return NextResponse.json({ 
+        error: 'No se pudo obtener el código de carrera' 
+      }, { status: 400 })
+    }
+    
+    // 3. Obtener ramos cursados/aprobados
+    const ramosCursados = await obtenerRamosCursados(rut, codigoCarrera, catalogo)
+    
+    // 4. Se obtiene dentro de obtenerRamosCursados
+    const mallaCurricular = await obtenerMallaCurricular(codigoCarrera)
     
     // 5. Construir malla temporal (combinar datos)
     const mallatemporal = construirMallaTemporal(
@@ -204,103 +219,156 @@ async function obtenerDatosEstudiante(email: string, password?: string) {
   }
 }
 
-async function obtenerRamosCursados(rut: string): Promise<RamoMalla[]> {
+function parsearPeriodo(period: string): { año: number; semestre: number; periodoMostrar: string } {
+  const año = parseInt(period.substring(0, 4))
+  const semestre = parseInt(period.substring(4, 5))
+  const periodoMostrar = `${año}-${semestre}`
+  return { año, semestre, periodoMostrar }
+}
+
+async function obtenerRamosCursados(rut: string, codCarrera?: string, catalogo?: string): Promise<RamoMalla[]> {
   try {
-    const url = `https://losvilos.ucn.cl/hawaii/api/estudiante/${rut}/ramos`
-    console.log('📚 [Ramos] Consultando ramos en:', url)
+    if (!codCarrera) {
+      console.log('⚠️ [Ramos] No hay código de carrera, retornando array vacío')
+      return []
+    }
+
+    const url = `https://puclaro.ucn.cl/eross/avance/avance.php?rut=${encodeURIComponent(rut)}&codcarrera=${encodeURIComponent(codCarrera)}`
+    console.log('📚 [Ramos] Consultando avance en:', url)
     
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'X-HAWAII-AUTH': 'jf400fejof13f',
         'Accept': 'application/json',
       },
+      cache: 'no-store',
     })
 
     console.log('📡 [Ramos] Status:', response.status, response.statusText)
 
-    if (response.ok) {
-      const data = await response.json()
-      console.log('📊 [Ramos] Datos recibidos:', data)
-      console.log('📈 [Ramos] Cantidad de ramos:', Array.isArray(data) ? data.length : 'No es array')
-      
-      // Analizar estructura de los primeros ramos para entender qué campos están disponibles
-      if (Array.isArray(data) && data.length > 0) {
-        console.log('🔍 [Ramos] Analizando estructura del primer ramo:')
-        console.log('  📝 Campos disponibles:', Object.keys(data[0]))
-        console.log('  📝 Primer ramo completo:', data[0])
-        
-        // Verificar específicamente campos de nombre
-        console.log('  📝 Campos de nombre disponibles:')
-        console.log('    - nombre:', data[0].nombre)
-        console.log('    - asignatura:', data[0].asignatura)
-        console.log('    - materia:', data[0].materia)
-        console.log('    - codigo:', data[0].codigo)
-      }
-      
-      if (!Array.isArray(data)) {
-        console.log('⚠️ [Ramos] Los datos no son un array:', typeof data)
-        return []
-      }
-      
-      // Transformar datos de la API a formato RamoMalla
-      const ramosTransformados = data.map((ramo: any) => {
-        // Priorizar nombre, luego usar código si no hay nombre
-        let nombreRamo = ramo.nombre || ramo.asignatura || ramo.materia || null
-        const codigoRamo = ramo.codigo || 'SIN-COD'
-        
-        // Si no hay nombre disponible, usar el código
-        if (!nombreRamo || nombreRamo.trim() === '') {
-          nombreRamo = codigoRamo
-          console.log(`📝 [Ramos] Usando código como nombre para: ${codigoRamo}`)
-        }
-        
-        const ramoTransformado = {
-          id: ramo.id || `${codigoRamo}-${ramo.semestre}` || Math.random().toString(),
-          nombre: nombreRamo,
-          codigo: codigoRamo,
-          creditos: parseInt(ramo.creditos) || parseInt(ramo.unidades) || 0,
-          semestre: parseInt(ramo.semestre) || parseInt(ramo.nivel) || 1,
-          estado: determinarEstadoRamo(ramo),
-          prerrequisitos: ramo.prerrequisitos || [],
-          profesor: ramo.profesor || ramo.docente || undefined,
-          seccion: ramo.seccion || ramo.grupo || undefined,
-          nota: ramo.nota ? parseFloat(ramo.nota) : undefined,
-          periodo: ramo.periodo || ramo.year || undefined
-        }
-        
-        console.log('🔄 [Ramos] Ramo transformado:', {
-          codigo: ramoTransformado.codigo,
-          nombre: ramoTransformado.nombre,
-          campoOriginal: {
-            nombre: ramo.nombre,
-            asignatura: ramo.asignatura,
-            materia: ramo.materia,
-            codigo: ramo.codigo
-          }
-        })
-        return ramoTransformado
-      })
-      
-      // Calcular estadísticas
-      const ramosAprobados = ramosTransformados.filter(r => r.estado === 'aprobado')
-      const ramosCursando = ramosTransformados.filter(r => r.estado === 'cursando')
-      const ramosReprobados = ramosTransformados.filter(r => r.estado === 'reprobado')
-      
-      console.log('📊 [Ramos] Estadísticas:')
-      console.log('  ✅ Aprobados:', ramosAprobados.length)
-      console.log('  📚 Cursando:', ramosCursando.length)
-      console.log('  ❌ Reprobados:', ramosReprobados.length)
-      console.log('  📈 Total:', ramosTransformados.length)
-      
-      return ramosTransformados
-    } else {
+    if (!response.ok) {
       console.log('❌ [Ramos] Error HTTP:', response.status)
       const errorText = await response.text().catch(() => 'No se pudo leer error')
       console.log('❌ [Ramos] Error details:', errorText)
+      
+      if (response.status === 404 || errorText.includes('no encontrado')) {
+        console.log('⚠️ [Ramos] Avance no encontrado, retornando array vacío')
+        return []
+      }
+      
+      return []
+    }
+
+    const data = await response.json()
+    
+    if (data.error) {
+      console.log('⚠️ [Ramos] API retornó error:', data.error)
+      return []
     }
     
-    return []
+    console.log('📊 [Ramos] Datos recibidos:', data)
+    
+    if (!Array.isArray(data)) {
+      console.log('⚠️ [Ramos] Los datos no son un array:', typeof data)
+      return []
+    }
+
+    if (data.length === 0) {
+      console.log('⚠️ [Ramos] No hay registros de avance')
+      return []
+    } 
+    console.log('📈 [Ramos] Cantidad de registros:', data.length)
+    
+    let mallaData: any[] = []
+    
+    if (codCarrera) {
+      try {
+        const cat = catalogo || '202410'
+        const mallaUrl = `https://losvilos.ucn.cl/hawaii/api/mallas?${codCarrera}-${cat}`
+        console.log('📚 [Ramos] Consultando malla curricular en:', mallaUrl)
+        
+        const mallaResponse = await fetch(mallaUrl, {
+          headers: {
+            'X-HAWAII-AUTH': 'jf400fejof13f',
+            'Accept': 'application/json',
+          },
+          cache: 'no-store',
+        })
+        
+        if (mallaResponse.ok) {
+          mallaData = await mallaResponse.json()
+          console.log('📚 [Ramos] Datos de malla curricular obtenidos:', mallaData.length, 'asignaturas')
+        } else {
+          console.log('⚠️ [Ramos] No se pudo obtener malla curricular, se usará valor por defecto')
+        }
+      } catch (e) {
+        console.log('⚠️ [Ramos] Error obteniendo malla curricular, se usará valor por defecto')
+      }
+    }
+    
+    const creditosPorCodigo = new Map<string, number>()
+    for (const asignatura of mallaData) {
+      if (asignatura.codigo && asignatura.creditos) {
+        creditosPorCodigo.set(asignatura.codigo, asignatura.creditos)
+      }
+    }
+    
+    const ramosTransformados: RamoMalla[] = []
+    const ramosPorCodigo = new Map<string, RamoMalla>()
+    
+    for (const registro of data) {
+      const codigo = registro.course
+      const creditos = creditosPorCodigo.get(codigo) || 0
+      
+      const { año, semestre, periodoMostrar } = parsearPeriodo(registro.period)
+      
+      const estadoNormalizado = registro.status.toUpperCase()
+      let estado: RamoMalla['estado'] = 'pendiente'
+      
+      if (estadoNormalizado.includes('APROB')) {
+        estado = 'aprobado'
+      } else if (estadoNormalizado.includes('REPRO')) {
+        estado = 'reprobado'
+      } else if (estadoNormalizado.includes('CURSANDO') || estadoNormalizado.includes('INSCRIT')) {
+        estado = 'cursando'
+      }
+      
+      if (!ramosPorCodigo.has(codigo)) {
+        const asignaturaMalla = mallaData.find(a => a.codigo === codigo)
+        const nombre = asignaturaMalla?.asignatura || asignaturaMalla?.nombre || codigo
+        
+        const nuevoRamo: RamoMalla = {
+          id: codigo,
+          nombre: nombre,
+          codigo: codigo,
+          creditos: creditos,
+          semestre: año, 
+          estado: estado,
+          prerrequisitos: asignaturaMalla?.prereq ? asignaturaMalla.prereq.split(',').map((p: string) => p.trim()) : [],
+          periodo: periodoMostrar
+        }
+        
+        ramosPorCodigo.set(codigo, nuevoRamo)
+        ramosTransformados.push(nuevoRamo)
+      }
+    }
+    
+    ramosTransformados.sort((a, b) => {
+      if (!a.periodo || !b.periodo) return 0
+      return a.periodo.localeCompare(b.periodo)
+    })
+    
+    const ramosAprobados = ramosTransformados.filter(r => r.estado === 'aprobado')
+    const ramosCursando = ramosTransformados.filter(r => r.estado === 'cursando')
+    const ramosReprobados = ramosTransformados.filter(r => r.estado === 'reprobado')
+    
+    console.log('📊 [Ramos] Estadísticas:')
+    console.log('  ✅ Aprobados:', ramosAprobados.length)
+    console.log('  📚 Cursando:', ramosCursando.length)
+    console.log('  ❌ Reprobados:', ramosReprobados.length)
+    console.log('  📈 Total:', ramosTransformados.length)
+    
+    return ramosTransformados
   } catch (error) {
     console.error('❌ [Ramos] Error obteniendo ramos cursados:', error)
     return []
@@ -374,30 +442,29 @@ function construirMallaTemporal(
   console.log('👤 [Construcción] Datos estudiante:', datosEstudiante)
   console.log('📚 [Construcción] Ramos cursados:', ramosCursados.length)
   
-  // Agrupar ramos por semestre
-  const semestresPorNumero = new Map<number, RamoMalla[]>()
+  const semestresPorPeriodo = new Map<string, RamoMalla[]>()
   
-  // Agregar ramos cursados
   ramosCursados.forEach(ramo => {
-    if (!semestresPorNumero.has(ramo.semestre)) {
-      semestresPorNumero.set(ramo.semestre, [])
+    const periodo = ramo.periodo || 'Sin período'
+    if (!semestresPorPeriodo.has(periodo)) {
+      semestresPorPeriodo.set(periodo, [])
     }
-    semestresPorNumero.get(ramo.semestre)!.push(ramo)
+    semestresPorPeriodo.get(periodo)!.push(ramo)
   })
 
-  // Convertir a array ordenado
-  const semestres = Array.from(semestresPorNumero.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([numero, ramos]) => {
+  const semestres = Array.from(semestresPorPeriodo.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([periodo, ramos], index) => {
       const creditosTotal = ramos.reduce((sum, r) => sum + r.creditos, 0)
       const creditosAprobados = ramos
         .filter(r => r.estado === 'aprobado')
         .reduce((sum, r) => sum + r.creditos, 0)
       
-      console.log(`📊 [Construcción] Semestre ${numero}: ${ramos.length} ramos, ${creditosAprobados}/${creditosTotal} créditos`)
+      console.log(`📊 [Construcción] Período ${periodo}: ${ramos.length} ramos, ${creditosAprobados}/${creditosTotal} créditos`)
       
       return {
-        numero,
+        numero: index + 1, 
+        periodo: periodo,  
         ramos: ramos.sort((a, b) => a.nombre.localeCompare(b.nombre)),
         creditosTotal,
         creditosAprobados
