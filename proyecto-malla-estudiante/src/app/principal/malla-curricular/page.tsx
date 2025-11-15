@@ -159,7 +159,7 @@ export default function MallaCurricularPage() {
           </div>
         )}
         {!cargando && !error && malla.length > 0 && (
-          <div className="space-y-8">
+          <div className="flex flex-row gap-6 overflow-x-auto pb-4">
             {niveles.map(([nivel, asignaturas]) => {
               // Calculamos estado para cada asignatura de este nivel
               const asignaturasConEstado = asignaturas.map(a => ({
@@ -168,11 +168,11 @@ export default function MallaCurricularPage() {
               }));
 
               return (
-                <section key={nivel} className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                <section key={nivel} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm w-72 flex-shrink-0">
                    <h2 className="text-xl font-semibold mb-4 text-slate-700 border-b pb-2">
                      Semestre {nivel}
                    </h2>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"> {/* Grid responsivo */}
+                  <div className="grid grid-cols-1 gap-4"> {/* Vertical */}
                     {asignaturasConEstado.map((a) => (
                       <TarjetaAsignatura
                         key={a.codigo}
