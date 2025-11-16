@@ -7,7 +7,7 @@ export async function GET(
   try {
     const { slug } = await params
     if (!slug) {
-      return NextResponse.json({ error: 'Parámetro slug requerido' }, { status: 400 })
+      return NextResponse.json({ error: 'Pacd "C:\Users\viceg\OneDrive\Documentos\GitHub\Proyecto-Agil\proyecto-malla-estudiante"rámetro slug requerido' }, { status: 400 })
     }
 
     const url = `https://losvilos.ucn.cl/hawaii/api/mallas?${slug}`
