@@ -1,3 +1,5 @@
+import { jwtVerify } from 'jose';
+
 export interface Usuario {
   rut: string
   carreras: Array<{
@@ -82,6 +84,21 @@ export function leerSesion(): Sesion | null {
     return JSON.parse(texto) as Sesion
   } catch {
     return null
+  }
+}
+
+export async function obtenerDatosDesdeToken(token: string): Promise<{ rut: string, codcarrera: string } | null> {
+  if (!token) return null;
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'default-secret-key');
+    const { payload } = await jwtVerify(token, secret);
+    return {
+      rut: payload.rut as string,
+      codcarrera: payload.codcarrera as string,
+    };
+  } catch (e) {
+    console.error('Error al verificar el token:', e);
+    return null;
   }
 }
 
