@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { obtenerDatosEstudiante } from '@/lib/services/ucn-auth.service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,22 +12,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const urlUCN = `https://puclaro.ucn.cl/eross/avance/login.php?email=${encodeURIComponent(email)}&password=${encodeURIComponent(contraseña)}`
+    const datosEstudiante = await obtenerDatosEstudiante(email, contraseña)
 
-    const respuesta = await fetch(urlUCN, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!respuesta.ok) {
-      throw new Error(`Error en la API externa: ${respuesta.status}`)
-    }
-
-    const datos = await respuesta.json()
-
-    if (datos.error) {
+    if (!datosEstudiante) {
       return NextResponse.json(
         { error: 'Credenciales incorrectas' },
         { status: 401 }
@@ -36,8 +24,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       usuario: {
-        rut: datos.rut,
-        carreras: datos.carreras
+        rut: datosEstudiante.rut,
+        carreras: datosEstudiante.carreras
       }
     })
 
