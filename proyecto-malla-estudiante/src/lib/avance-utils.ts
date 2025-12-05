@@ -19,7 +19,7 @@ function normalizarEstado(estado: string): 'APROBADO' | 'REPROBADO' | 'OTRO' {
   return 'OTRO'
 }
 
-function verificarAlertaAcademica(avance: Avance): 'Normal' | 'Alerta Académica' {
+export function verificarAlertaAcademica(avance: Avance): 'Normal' | 'Alerta Académica' {
   const intentosPorCurso: Map<string, number> = new Map()
   const reprobadosPorSemestre: Map<string, string[]> = new Map()
 
