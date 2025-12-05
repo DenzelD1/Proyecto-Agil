@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import BarraSuperior from "@/components/BarraSuperior"
 import NavMallas from "@/components/NavMallas"
 import Breadcrumb from "@/components/Breadcrumb"
@@ -8,6 +9,9 @@ import { leerSesion } from "@/lib/servicio-auth"
 import { AsignaturaMalla, MallaCarrera } from "@/types/malla"
 import { Avance } from "@/types/avance"
 import TarjetaAsignatura from "@/components/TarjetaAsignatura"
+import ModalGuardarProyeccion from "@/components/ModalGuardarProyeccion"
+import ModalAdvertencia from "@/components/ModalAdvertencia"
+import SelectorProyeccion, { ProyeccionGuardada } from "@/components/SelectorProyeccion"
 import {
   calcularAsignaturasDisponibles,
   calcularCreditosSemestre,
@@ -15,20 +19,31 @@ import {
   validarSemestre,
   puedeCrearNuevoSemestre,
   estaEnAlertaAcademica,
-  SemestreProyectado,
-  ProyeccionMalla
+  SemestreProyectado
 } from "@/lib/malla-proyectada-utils"
 import { cn } from "@/lib/utils"
 
 export default function MallaProyectadaPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  
   const [malla, setMalla] = useState<MallaCarrera>([])
   const [avance, setAvance] = useState<Avance>([])
   const [semestresProyectados, setSemestresProyectados] = useState<SemestreProyectado[]>([])
+  const [proyeccionesGuardadas, setProyeccionesGuardadas] = useState<ProyeccionGuardada[]>([])
+  const [proyeccionActual, setProyeccionActual] = useState<ProyeccionGuardada | null>(null)
   const [cargando, setCargando] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [usuario, setUsuario] = useState<any>(null)
   const [asignaturaArrastrando, setAsignaturaArrastrando] = useState<AsignaturaMalla | null>(null)
   const [semestreDestino, setSemestreDestino] = useState<number | null>(null)
+  const [mostrarModalGuardar, setMostrarModalGuardar] = useState(false)
+  const [mostrarModalAdvertencia, setMostrarModalAdvertencia] = useState(false)
+  const [isGuardando, setIsGuardando] = useState(false)
+  const [accionPendiente, setAccionPendiente] = useState<(() => void) | null>(null)
+  const [autoGuardadoHabilitado, setAutoGuardadoHabilitado] = useState(false)
+  const [tieneCambiosSinGuardar, setTieneCambiosSinGuardar] = useState(false)
+  const ultimoGuardadoRef = useRef<string>("")
 
   // Cargar datos del usuario
   useEffect(() => {
@@ -40,6 +55,22 @@ export default function MallaProyectadaPage() {
       setCargando(false)
     }
   }, [])
+
+  const cargarProyecciones = useCallback(async () => {
+    if (!usuario?.rut || !usuario?.carreras?.[0]?.codigo) return
+
+    try {
+      const response = await fetch(
+        `/api/proyecciones?rut=${encodeURIComponent(usuario.rut)}&codigoCarrera=${encodeURIComponent(usuario.carreras[0].codigo)}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setProyeccionesGuardadas(data)
+      }
+    } catch (error) {
+      console.error('Error cargando proyecciones:', error)
+    }
+  }, [usuario])
 
   // Cargar datos de malla y avance
   const cargarDatos = useCallback(async () => {
@@ -80,16 +111,7 @@ export default function MallaProyectadaPage() {
       }
       setAvance(avanceData as Avance)
 
-      // Cargar proyección guardada
-      const proyeccionGuardada = localStorage.getItem(`proyeccion_${usuario.rut}_${c.codigo}`)
-      if (proyeccionGuardada) {
-        try {
-          const proyeccion: ProyeccionMalla = JSON.parse(proyeccionGuardada)
-          setSemestresProyectados(proyeccion.semestres || [])
-        } catch (e) {
-          console.error('Error al cargar proyección guardada:', e)
-        }
-      }
+      await cargarProyecciones()
 
     } catch (e: any) {
       console.error("Error en cargarDatos:", e)
@@ -99,7 +121,7 @@ export default function MallaProyectadaPage() {
     } finally {
       setCargando(false)
     }
-  }, [usuario, error])
+  }, [usuario, error, cargarProyecciones])
 
   useEffect(() => {
     if (usuario) {
@@ -107,23 +129,183 @@ export default function MallaProyectadaPage() {
     }
   }, [usuario, cargarDatos])
 
-  // Guardar proyección en localStorage
-  const guardarProyeccion = useCallback(() => {
-    if (!usuario?.rut || !usuario?.carreras?.[0]?.codigo) return
+  useEffect(() => {
+    const estadoActual = JSON.stringify(semestresProyectados)
+    const tieneCambios = estadoActual !== ultimoGuardadoRef.current
     
-    const proyeccion: ProyeccionMalla = {
-      semestres: semestresProyectados
+    if (autoGuardadoHabilitado && tieneCambios && semestresProyectados.length > 0) {
+      guardarProyeccionAutomatica()
+    } else {
+      setTieneCambiosSinGuardar(tieneCambios)
     }
+  }, [semestresProyectados, autoGuardadoHabilitado])
+
+  const guardarProyeccionEnBD = useCallback(async (nombre: string): Promise<void> => {
+    if (!usuario?.rut || !usuario?.carreras?.[0]?.codigo) {
+      throw new Error('No hay datos de usuario')
+    }
+
+    setIsGuardando(true)
+    try {
+      const response = await fetch('/api/proyecciones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rut: usuario.rut,
+          codigoCarrera: usuario.carreras[0].codigo,
+          nombre,
+          semestres: semestresProyectados
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al guardar la proyección')
+      }
+
+      const data = await response.json()
+      setProyeccionActual(data.proyeccion)
+      setAutoGuardadoHabilitado(true)
+      setTieneCambiosSinGuardar(false)
+      ultimoGuardadoRef.current = JSON.stringify(semestresProyectados)
+      
+      await cargarProyecciones()
+    } finally {
+      setIsGuardando(false)
+    }
+  }, [semestresProyectados, usuario, cargarProyecciones])
+
+  const guardarProyeccionAutomatica = useCallback(async () => {
+    if (!proyeccionActual || !autoGuardadoHabilitado) return
+
+    try {
+      const response = await fetch(`/api/proyecciones/${proyeccionActual.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          semestres: semestresProyectados
+        })
+      })
+
+      if (response.ok) {
+        ultimoGuardadoRef.current = JSON.stringify(semestresProyectados)
+        setTieneCambiosSinGuardar(false)
+        await cargarProyecciones()
+      }
+    } catch (error) {
+      console.error('Error en guardado automático:', error)
+    }
+  }, [semestresProyectados, proyeccionActual, autoGuardadoHabilitado, cargarProyecciones])
+
+  const handleGuardarManual = useCallback(async (nombre: string) => {
+    await guardarProyeccionEnBD(nombre)
+  }, [guardarProyeccionEnBD])
+
+  const handleAdvertenciaConfirmar = useCallback(async () => {
+    setMostrarModalAdvertencia(false)
+    setMostrarModalGuardar(true)
+  }, [])
+
+  const handleAdvertenciaCancelar = useCallback(() => {
+    setMostrarModalAdvertencia(false)
+    setTieneCambiosSinGuardar(false)
+    setAutoGuardadoHabilitado(false)
+    setProyeccionActual(null)
+    setSemestresProyectados([])
+    ultimoGuardadoRef.current = ""
     
-    localStorage.setItem(
-      `proyeccion_${usuario.rut}_${usuario.carreras[0].codigo}`,
-      JSON.stringify(proyeccion)
-    )
-  }, [semestresProyectados, usuario])
+    if (accionPendiente) {
+      accionPendiente()
+      setAccionPendiente(null)
+    }
+  }, [accionPendiente])
 
   useEffect(() => {
-    guardarProyeccion()
-  }, [semestresProyectados, guardarProyeccion])
+    if (!tieneCambiosSinGuardar) return
+
+    const handleClick = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const link = target.closest('a[href]') as HTMLAnchorElement
+
+      if (!link) return
+
+      const href = link.getAttribute('href')
+      if (!href || href === pathname || href.startsWith('http') || href.startsWith('#')) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      setAccionPendiente(() => () => router.push(href))
+      setMostrarModalAdvertencia(true)
+    }
+
+    document.addEventListener('click', handleClick, true)
+    return () => {
+      document.removeEventListener('click', handleClick, true)
+    }
+  }, [tieneCambiosSinGuardar, pathname, router])
+
+  const handleSeleccionarProyeccion = useCallback(async (proyeccion: ProyeccionGuardada | null) => {
+    if (tieneCambiosSinGuardar && !proyeccionActual) {
+      setAccionPendiente(() => () => {
+        if (proyeccion) {
+          setProyeccionActual(proyeccion)
+          setSemestresProyectados(proyeccion.semestres as SemestreProyectado[])
+          setAutoGuardadoHabilitado(true)
+          ultimoGuardadoRef.current = JSON.stringify(proyeccion.semestres)
+          setTieneCambiosSinGuardar(false)
+        } else {
+          setProyeccionActual(null)
+          setSemestresProyectados([])
+          setAutoGuardadoHabilitado(false)
+          ultimoGuardadoRef.current = ""
+          setTieneCambiosSinGuardar(false)
+        }
+      })
+      setMostrarModalAdvertencia(true)
+      return
+    }
+
+    if (proyeccion) {
+      setProyeccionActual(proyeccion)
+      setSemestresProyectados(proyeccion.semestres as SemestreProyectado[])
+      setAutoGuardadoHabilitado(true)
+      ultimoGuardadoRef.current = JSON.stringify(proyeccion.semestres)
+      setTieneCambiosSinGuardar(false)
+    } else {
+      setProyeccionActual(null)
+      setSemestresProyectados([])
+      setAutoGuardadoHabilitado(false)
+      ultimoGuardadoRef.current = ""
+      setTieneCambiosSinGuardar(false)
+    }
+  }, [tieneCambiosSinGuardar, proyeccionActual])
+
+  const handleEliminarProyeccion = useCallback(async (id: number) => {
+    try {
+      const response = await fetch(`/api/proyecciones/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await cargarProyecciones()
+        if (proyeccionActual?.id === id) {
+          setProyeccionActual(null)
+          setSemestresProyectados([])
+          setAutoGuardadoHabilitado(false)
+          ultimoGuardadoRef.current = ""
+          setTieneCambiosSinGuardar(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error eliminando proyección:', error)
+      throw error
+    }
+  }, [proyeccionActual, cargarProyecciones])
 
   // Calcular asignaturas disponibles
   const asignaturasDisponibles = useMemo(() => {
@@ -150,21 +332,17 @@ export default function MallaProyectadaPage() {
 
     if (!asignaturaArrastrando) return
 
-    // Verificar que la asignatura no esté ya en ese semestre
     const semestre = semestresProyectados.find(s => s.numero === semestreNumero)
     if (semestre?.asignaturas.some(a => a.codigo === asignaturaArrastrando.codigo)) {
       setAsignaturaArrastrando(null)
       return
     }
 
-    // Obtener el semestre anterior para calcular máximo de créditos
     const semestreAnterior = semestreNumero > 1
       ? semestresProyectados.find(s => s.numero === semestreNumero - 1)
       : undefined
 
     const maxCreditos = obtenerMaximoCreditos(avance, semestreAnterior)
-
-    // Calcular créditos si agregamos esta asignatura
     const creditosActuales = semestre
       ? calcularCreditosSemestre(semestre.asignaturas)
       : 0
@@ -175,7 +353,6 @@ export default function MallaProyectadaPage() {
       return
     }
 
-    // Agregar asignatura al semestre
     setSemestresProyectados(prev => {
       const nuevo = [...prev]
       const indice = nuevo.findIndex(s => s.numero === semestreNumero)
@@ -200,7 +377,6 @@ export default function MallaProyectadaPage() {
     setAsignaturaArrastrando(null)
   }
 
-  // Eliminar asignatura de un semestre
   const eliminarAsignatura = (semestreNumero: number, codigoAsignatura: string) => {
     setSemestresProyectados(prev => {
       const nuevo = prev.map(semestre => {
@@ -215,7 +391,6 @@ export default function MallaProyectadaPage() {
         return semestre
       })
 
-      // Eliminar semestres vacíos excepto el primero
       return nuevo.filter((s, index) => {
         if (s.asignaturas.length === 0 && index > 0) return false
         return true
@@ -223,10 +398,27 @@ export default function MallaProyectadaPage() {
     })
   }
 
-  // Agregar nuevo semestre
   const agregarNuevoSemestre = () => {
+    if (tieneCambiosSinGuardar && !proyeccionActual) {
+      setAccionPendiente(() => () => {
+        const validacion = puedeCrearNuevoSemestre(semestresProyectados, avance)
+        if (!validacion.puede) {
+          alert(validacion.error)
+          return
+        }
+        const nuevoNumero = semestresProyectados.length > 0
+          ? Math.max(...semestresProyectados.map(s => s.numero)) + 1
+          : 1
+        setSemestresProyectados(prev => [
+          ...prev,
+          { numero: nuevoNumero, asignaturas: [], creditos: 0 }
+        ])
+      })
+      setMostrarModalAdvertencia(true)
+      return
+    }
+
     const validacion = puedeCrearNuevoSemestre(semestresProyectados, avance)
-    
     if (!validacion.puede) {
       alert(validacion.error)
       return
@@ -238,19 +430,13 @@ export default function MallaProyectadaPage() {
 
     setSemestresProyectados(prev => [
       ...prev,
-      {
-        numero: nuevoNumero,
-        asignaturas: [],
-        creditos: 0
-      }
+      { numero: nuevoNumero, asignaturas: [], creditos: 0 }
     ])
   }
 
-  // Eliminar semestre
   const eliminarSemestre = (semestreNumero: number) => {
     setSemestresProyectados(prev => {
       const nuevo = prev.filter(s => s.numero !== semestreNumero)
-      // Renumerar semestres
       return nuevo.map((s, index) => ({
         ...s,
         numero: index + 1
@@ -258,7 +444,6 @@ export default function MallaProyectadaPage() {
     })
   }
 
-  // Obtener el número del próximo semestre
   const proximoSemestre = semestresProyectados.length > 0
     ? Math.max(...semestresProyectados.map(s => s.numero)) + 1
     : 1
@@ -272,15 +457,40 @@ export default function MallaProyectadaPage() {
       <Breadcrumb />
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Malla Proyectada</h1>
-          <p className="text-slate-600">
-            Organiza tus semestres futuros arrastrando asignaturas disponibles
-            {enAlerta && (
-              <span className="ml-2 text-red-600 font-semibold">
-                (Alerta Académica: máximo 15 créditos en el próximo semestre)
-              </span>
-            )}
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-800 mb-2">Malla Proyectada</h1>
+              <p className="text-slate-600">
+                Organiza tus semestres futuros arrastrando asignaturas disponibles
+                {enAlerta && (
+                  <span className="ml-2 text-red-600 font-semibold">
+                    (Alerta Académica: máximo 15 créditos en el próximo semestre)
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <SelectorProyeccion
+                proyecciones={proyeccionesGuardadas}
+                proyeccionActual={proyeccionActual}
+                onSeleccionar={handleSeleccionarProyeccion}
+                onEliminar={handleEliminarProyeccion}
+                onNueva={() => handleSeleccionarProyeccion(null)}
+              />
+              <button
+                onClick={() => setMostrarModalGuardar(true)}
+                disabled={semestresProyectados.length === 0}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                💾 Guardar Proyección
+              </button>
+              {tieneCambiosSinGuardar && (
+                <span className="text-sm text-orange-600 font-medium">
+                  ● Cambios sin guardar
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {cargando && (
@@ -295,7 +505,6 @@ export default function MallaProyectadaPage() {
 
         {!cargando && !error && (
           <div className="space-y-6">
-            {/* Asignaturas Disponibles */}
             <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
               <h2 className="text-xl font-semibold mb-4 text-slate-700 border-b pb-2">
                 Asignaturas Disponibles ({asignaturasDisponibles.length})
@@ -319,7 +528,6 @@ export default function MallaProyectadaPage() {
               </div>
             </section>
 
-            {/* Semestres Proyectados */}
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-slate-700">
@@ -391,10 +599,7 @@ export default function MallaProyectadaPage() {
 
                       <div className="space-y-2">
                         {semestre.asignaturas.map((asignatura) => (
-                          <div
-                            key={asignatura.codigo}
-                            className="relative group"
-                          >
+                          <div key={asignatura.codigo} className="relative group">
                             <TarjetaAsignatura asignatura={asignatura} estado="disponible" />
                             <button
                               onClick={() => eliminarAsignatura(semestre.numero, asignatura.codigo)}
@@ -430,7 +635,20 @@ export default function MallaProyectadaPage() {
           </div>
         )}
       </main>
+
+      <ModalGuardarProyeccion
+        isOpen={mostrarModalGuardar}
+        onClose={() => setMostrarModalGuardar(false)}
+        onSave={handleGuardarManual}
+        nombreActual={proyeccionActual?.nombre}
+        isGuardando={isGuardando}
+      />
+
+      <ModalAdvertencia
+        isOpen={mostrarModalAdvertencia}
+        onConfirm={handleAdvertenciaConfirmar}
+        onCancel={handleAdvertenciaCancelar}
+      />
     </div>
   )
 }
-
