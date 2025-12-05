@@ -129,16 +129,9 @@ export default function MallaProyectadaPage() {
     }
   }, [usuario, cargarDatos])
 
-  useEffect(() => {
-    const estadoActual = JSON.stringify(semestresProyectados)
-    const tieneCambios = estadoActual !== ultimoGuardadoRef.current
-    
-    if (autoGuardadoHabilitado && tieneCambios && semestresProyectados.length > 0) {
-      guardarProyeccionAutomatica()
-    } else {
-      setTieneCambiosSinGuardar(tieneCambios)
-    }
-  }, [semestresProyectados, autoGuardadoHabilitado])
+  const tieneAsignaturas = useMemo(() => {
+    return semestresProyectados.some(semestre => semestre.asignaturas.length > 0)
+  }, [semestresProyectados])
 
   const guardarProyeccionEnBD = useCallback(async (nombre: string): Promise<void> => {
     if (!usuario?.rut || !usuario?.carreras?.[0]?.codigo) {
@@ -201,6 +194,19 @@ export default function MallaProyectadaPage() {
     }
   }, [semestresProyectados, proyeccionActual, autoGuardadoHabilitado, cargarProyecciones])
 
+  useEffect(() => {
+    const estadoActual = JSON.stringify(semestresProyectados)
+    const tieneCambios = estadoActual !== ultimoGuardadoRef.current
+    
+    const tieneCambiosReales = tieneCambios && tieneAsignaturas
+    
+    if (autoGuardadoHabilitado && tieneCambiosReales && semestresProyectados.length > 0) {
+      guardarProyeccionAutomatica()
+    } else {
+      setTieneCambiosSinGuardar(tieneCambiosReales)
+    }
+  }, [semestresProyectados, autoGuardadoHabilitado, tieneAsignaturas, guardarProyeccionAutomatica])
+
   const handleGuardarManual = useCallback(async (nombre: string) => {
     await guardarProyeccionEnBD(nombre)
   }, [guardarProyeccionEnBD])
@@ -225,7 +231,7 @@ export default function MallaProyectadaPage() {
   }, [accionPendiente])
 
   useEffect(() => {
-    if (!tieneCambiosSinGuardar) return
+    if (!tieneCambiosSinGuardar || !tieneAsignaturas) return
 
     const handleClick = async (e: MouseEvent) => {
       const target = e.target as HTMLElement
@@ -247,10 +253,10 @@ export default function MallaProyectadaPage() {
     return () => {
       document.removeEventListener('click', handleClick, true)
     }
-  }, [tieneCambiosSinGuardar, pathname, router])
+    }, [tieneCambiosSinGuardar, tieneAsignaturas, pathname, router])
 
   const handleSeleccionarProyeccion = useCallback(async (proyeccion: ProyeccionGuardada | null) => {
-    if (tieneCambiosSinGuardar && !proyeccionActual) {
+    if (tieneCambiosSinGuardar && tieneAsignaturas && !proyeccionActual) {
       setAccionPendiente(() => () => {
         if (proyeccion) {
           setProyeccionActual(proyeccion)
@@ -283,7 +289,7 @@ export default function MallaProyectadaPage() {
       ultimoGuardadoRef.current = ""
       setTieneCambiosSinGuardar(false)
     }
-  }, [tieneCambiosSinGuardar, proyeccionActual])
+  }, [tieneCambiosSinGuardar, tieneAsignaturas, proyeccionActual])
 
   const handleEliminarProyeccion = useCallback(async (id: number) => {
     try {
@@ -399,7 +405,7 @@ export default function MallaProyectadaPage() {
   }
 
   const agregarNuevoSemestre = () => {
-    if (tieneCambiosSinGuardar && !proyeccionActual) {
+    if (tieneCambiosSinGuardar && tieneAsignaturas && !proyeccionActual) {
       setAccionPendiente(() => () => {
         const validacion = puedeCrearNuevoSemestre(semestresProyectados, avance)
         if (!validacion.puede) {
