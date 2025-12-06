@@ -30,7 +30,7 @@ function estaAprobada(codigo: string, avance: Avance): boolean {
 /**
  * Obtiene las asignaturas aprobadas
  */
-function obtenerAsignaturasAprobadas(avance: Avance): Set<string> {
+export function obtenerAsignaturasAprobadas(avance: Avance): Set<string> {
   const aprobadas = new Set<string>()
   for (const registro of avance) {
     const statusNormalizado = registro.status.toUpperCase()

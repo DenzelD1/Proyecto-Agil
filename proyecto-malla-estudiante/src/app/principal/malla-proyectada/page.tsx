@@ -21,6 +21,7 @@ import {
   estaEnAlertaAcademica,
   SemestreProyectado
 } from "@/lib/malla-proyectada-utils"
+import { proyectarEgresoAutomatico } from "@/lib/proyeccion-automatica"
 import { cn } from "@/lib/utils"
 
 export default function MallaProyectadaPage() {
@@ -450,6 +451,29 @@ export default function MallaProyectadaPage() {
     })
   }
 
+  const proyectarEgreso = () => {
+    if (tieneCambiosSinGuardar && tieneAsignaturas && !proyeccionActual) {
+      setAccionPendiente(() => () => {
+        const nuevosSemestres = proyectarEgresoAutomatico(malla, avance, semestresProyectados)
+        if (nuevosSemestres.length > 0) {
+          setSemestresProyectados(prev => [...prev, ...nuevosSemestres])
+        } else {
+          alert('No hay asignaturas pendientes para proyectar')
+        }
+      })
+      setMostrarModalAdvertencia(true)
+      return
+    }
+
+    const nuevosSemestres = proyectarEgresoAutomatico(malla, avance, semestresProyectados)
+    if (nuevosSemestres.length > 0) {
+      setSemestresProyectados(prev => [...prev, ...nuevosSemestres])
+      alert(`Se han proyectado ${nuevosSemestres.length} semestre(s) automáticamente`)
+    } else {
+      alert('No hay asignaturas pendientes para proyectar')
+    }
+  }
+
   const proximoSemestre = semestresProyectados.length > 0
     ? Math.max(...semestresProyectados.map(s => s.numero)) + 1
     : 1
@@ -475,7 +499,7 @@ export default function MallaProyectadaPage() {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <SelectorProyeccion
                 proyecciones={proyeccionesGuardadas}
                 proyeccionActual={proyeccionActual}
@@ -483,6 +507,12 @@ export default function MallaProyectadaPage() {
                 onEliminar={handleEliminarProyeccion}
                 onNueva={() => handleSeleccionarProyeccion(null)}
               />
+              <button
+                onClick={proyectarEgreso}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+              >
+                🎯 Proyectar Egreso
+              </button>
               <button
                 onClick={() => setMostrarModalGuardar(true)}
                 disabled={semestresProyectados.length === 0}
