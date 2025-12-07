@@ -186,8 +186,7 @@ export function calcularAsignaturasDisponibles(
     )
     if (yaProyectada) return false
     
-    // Verificar prerrequisitos usando el conjunto completado (aprobadas + inscritas)
-    return prerrequisitosCumplidos(asignatura, completadasParaPrereq, semestresProyectados)
+    return true
   })
 }
 
