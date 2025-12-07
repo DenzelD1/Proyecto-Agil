@@ -21,4 +21,25 @@ describe('ucn-malla.service', () => {
     const res = await obtenerMallasMultiples([{ codigo: 'A', catalogo: '202410' }, { codigo: 'B', catalogo: '202410' }])
     expect(Array.isArray(res)).toBe(true)
   })
+
+  test('obtenerMallaCurricular maneja 404 devolviendo array vacio', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
+    const res = await obtenerMallaCurricular('NOPE', '202410')
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(0)
+  })
+
+  test('obtenerMallaCurricular maneja respuesta no-array devolviendo []', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, json: async () => ({ foo: 'bar' }) })
+    const res = await obtenerMallaCurricular('X', '202410')
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(0)
+  })
+
+  test('obtenerMallaCurricular atrapa excepcion de fetch y devuelve []', async () => {
+    ;(global.fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
+    const res = await obtenerMallaCurricular('X', '202410')
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(0)
+  })
 })

@@ -97,4 +97,62 @@ describe('malla-proyectada-utils', () => {
     // No hay aprobadas ni inscritas -> debe aparecer Z y D en la lista de disponibles
     expect(disponibles.map(d => d.codigo).sort()).toEqual(['D','Z'])
   })
+
+  test('estaAprobada detecta estado segun ultimo registro', () => {
+    const avance: Avance = [
+      { nrc: '1', period: '202410', student: '1', course: 'X', status: 'APROBADO' }
+    ]
+    expect((require('../../../src/lib/malla-proyectada-utils').estaAprobada)('X', avance)).toBe(true)
+
+    const avance2: Avance = [
+      { nrc: '1', period: '202410', student: '1', course: 'Y', status: 'APROBADO' },
+      { nrc: '2', period: '202520', student: '1', course: 'Y', status: 'REPROBADO' }
+    ]
+    expect((require('../../../src/lib/malla-proyectada-utils').estaAprobada)('Y', avance2)).toBe(false)
+  })
+
+  test('obtenerAsignaturasCompletadas combina aprobadas y proyectadas', () => {
+    const aprobadas = new Set(['A'])
+    const sems: any = [{ numero: 1, asignaturas: [{ codigo: 'B', asignatura: 'B', creditos: 6 }], creditos: 6 }]
+    const comp = (require('../../../src/lib/malla-proyectada-utils').obtenerAsignaturasCompletadas)(aprobadas, sems)
+    expect(comp.has('A')).toBe(true)
+    expect(comp.has('B')).toBe(true)
+  })
+
+  test('prerrequisitosCumplidos retorna false cuando faltan prereqs', () => {
+    const aprobadas = new Set<string>()
+    const sems: any = [{ numero: 1, asignaturas: [], creditos: 0 }]
+    const asign: AsignaturaMalla = { codigo: 'D', asignatura: 'D', creditos: 6, prereq: 'Z' }
+    const ok = (require('../../../src/lib/malla-proyectada-utils').prerrequisitosCumplidos)(asign as any, aprobadas, sems)
+    expect(ok).toBe(false)
+  })
+
+  test('calcularCreditosSemestre suma correctamente', () => {
+    const c = (require('../../../src/lib/malla-proyectada-utils').calcularCreditosSemestre)([
+      { codigo: 'A', asignatura: 'A', creditos: 5 },
+      { codigo: 'B', asignatura: 'B', creditos: 7 }
+    ] as any)
+    expect(c).toBe(12)
+  })
+
+  test('estaEnAlertaAcademica detecta alerta', () => {
+    const avance: Avance = [
+      { nrc: '1', period: '202410', student: '1', course: 'Z', status: 'REPROBADO' },
+      { nrc: '2', period: '202520', student: '1', course: 'Z', status: 'REPROBADO' },
+      { nrc: '3', period: '202610', student: '1', course: 'Z', status: 'REPROBADO' }
+    ]
+    const res = (require('../../../src/lib/malla-proyectada-utils').estaEnAlertaAcademica)(avance)
+    expect(res).toBe(true)
+  })
+
+  test('validarSemestre valido pasa con >=12 creditos', () => {
+    const sem: any = { asignaturas: [{ codigo: 'A', creditos: 6 }, { codigo: 'B', creditos: 6 }], creditos: 12 }
+    expect(validarSemestre(sem, 30).valido).toBe(true)
+  })
+
+  test('puedeCrearNuevoSemestre con semestre valido permite crearlo (>=12 créditos)', () => {
+    const sems: any = [{ numero: 1, asignaturas: [{ codigo: 'A', creditos: 6 }, { codigo: 'B', creditos: 6 }], creditos: 12 }]
+    const res = puedeCrearNuevoSemestre(sems, [])
+    expect(res.puede).toBe(true)
+  })
 })
