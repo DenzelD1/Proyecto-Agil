@@ -538,22 +538,24 @@ export default function MallaProyectadaPage() {
               <h2 className="text-xl font-semibold mb-4 text-slate-700 border-b pb-2">
                 Asignaturas Disponibles ({asignaturasDisponibles.length})
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {asignaturasDisponibles.map((asignatura) => (
-                  <div
-                    key={asignatura.codigo}
-                    draggable
-                    onDragStart={() => handleDragStart(asignatura)}
-                    className="cursor-move hover:opacity-80 transition-opacity"
-                  >
-                    <TarjetaAsignatura asignatura={asignatura} estado="disponible" />
-                  </div>
-                ))}
-                {asignaturasDisponibles.length === 0 && (
-                  <div className="col-span-full text-center text-slate-500 py-8">
-                    No hay asignaturas disponibles para proyectar
-                  </div>
-                )}
+              <div className="max-h-[300px] overflow-y-auto pr-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {asignaturasDisponibles.map((asignatura) => (
+                    <div
+                      key={asignatura.codigo}
+                      draggable
+                      onDragStart={() => handleDragStart(asignatura)}
+                      className="cursor-move hover:opacity-80 transition-opacity"
+                    >
+                      <TarjetaAsignatura asignatura={asignatura} estado="disponible" />
+                    </div>
+                  ))}
+                  {asignaturasDisponibles.length === 0 && (
+                    <div className="col-span-full text-center text-slate-500 py-8">
+                      No hay asignaturas disponibles para proyectar
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
 
