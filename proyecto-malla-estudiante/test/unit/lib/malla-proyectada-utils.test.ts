@@ -4,9 +4,9 @@ import { AsignaturaMalla } from '../../../src/types/malla'
 
 describe('malla-proyectada-utils', () => {
   const malla: AsignaturaMalla[] = [
-    { codigo: 'A', asignatura: 'A', creditos: 6 },
-    { codigo: 'B', asignatura: 'B', creditos: 6, prereq: 'A' },
-    { codigo: 'C', asignatura: 'C', creditos: 6, prereq: 'B' }
+    { codigo: 'A', asignatura: 'A', creditos: 6, nivel: 1 },
+    { codigo: 'B', asignatura: 'B', creditos: 6, prereq: 'A', nivel: 1 },
+    { codigo: 'C', asignatura: 'C', creditos: 6, prereq: 'B', nivel: 1 }
   ]
 
   test('obtenerAsignaturasAprobadas considera ultimo registro por periodo', () => {
@@ -20,28 +20,25 @@ describe('malla-proyectada-utils', () => {
   })
 
   test('obtenerAsignaturasAprobadasEInscritas marca INSCRITO excluded:false como completadas', () => {
-    const avance: Avance = [
-      { nrc: '10', period: '202520', student: '1', course: 'B', status: 'INSCRITO', /* @ts-ignore */ excluded: false }
-    ]
+    const reg: any = { nrc: '10', period: '202520', student: '1', course: 'B', status: 'INSCRITO', excluded: false }
+    const avance: Avance = [reg as unknown as (import('../../../src/types/avance').RegistroAvance & { excluded?: boolean })]
 
     const comp = obtenerAsignaturasAprobadasEInscritas(avance)
     expect(comp.has('B')).toBe(true)
   })
 
   test('INSCRITO excluded:true no se considera inscrito (debe aparecer como disponible)', () => {
-    const avance: Avance = [
-      { nrc: '11', period: '202520', student: '1', course: 'C', status: 'INSCRITO', /* @ts-ignore */ excluded: true }
-    ]
+    const reg2: any = { nrc: '11', period: '202520', student: '1', course: 'C', status: 'INSCRITO', excluded: true }
+    const avance: Avance = [reg2 as unknown as (import('../../../src/types/avance').RegistroAvance & { excluded?: boolean })]
 
     const comp = obtenerAsignaturasAprobadasEInscritas(avance)
     expect(comp.has('C')).toBe(false)
   })
 
   test('calcularAsignaturasDisponibles excluye aprobadas e inscritas actuales', () => {
-    const avance: Avance = [
-      { nrc: '20', period: '202520', student: '1', course: 'A', status: 'APROBADO' },
-      { nrc: '21', period: '202520', student: '1', course: 'B', status: 'INSCRITO', /* @ts-ignore */ excluded: false }
-    ]
+    const regA: any = { nrc: '20', period: '202520', student: '1', course: 'A', status: 'APROBADO' }
+    const regB: any = { nrc: '21', period: '202520', student: '1', course: 'B', status: 'INSCRITO', excluded: false }
+    const avance: Avance = [regA as unknown as import('../../../src/types/avance').RegistroAvance, regB as unknown as (import('../../../src/types/avance').RegistroAvance & { excluded?: boolean })]
 
     const disponibles = calcularAsignaturasDisponibles(malla as any, avance, [])
     // A está aprobada -> no en disponibles; B está inscrita -> no en disponibles; C pendiente -> sí
@@ -50,8 +47,8 @@ describe('malla-proyectada-utils', () => {
 
   test('prerrequisitosCumplenEnSemestre requiere prereqs en semestres anteriores', () => {
     const avance: Avance = []
-    const semestres = [ { numero: 1, asignaturas: [{ codigo: 'A', asignatura: 'A', creditos: 6 }], creditos: 6 } ]
-    const asignaturaB: AsignaturaMalla = { codigo: 'B', asignatura: 'B', creditos: 6, prereq: 'A' }
+    const semestres = [ { numero: 1, asignaturas: [{ codigo: 'A', asignatura: 'A', creditos: 6, nivel: 1 }], creditos: 6 } ]
+    const asignaturaB: AsignaturaMalla = { codigo: 'B', asignatura: 'B', creditos: 6, prereq: 'A', nivel: 1 }
 
     const result = prerrequisitosCumplenEnSemestre(asignaturaB as any, new Set(), semestres as any, 2)
     expect(result.cumplen).toBe(true)
@@ -88,8 +85,8 @@ describe('malla-proyectada-utils', () => {
 
   test('calcularAsignaturasDisponibles incluye asignatura con prereq no cumplido (lista completa)', () => {
     const malla2: AsignaturaMalla[] = [
-      { codigo: 'Z', asignatura: 'Z', creditos: 6 },
-      { codigo: 'D', asignatura: 'D', creditos: 6, prereq: 'Z' }
+      { codigo: 'Z', asignatura: 'Z', creditos: 6, nivel: 1 },
+      { codigo: 'D', asignatura: 'D', creditos: 6, prereq: 'Z', nivel: 1 }
     ]
     const avance: Avance = []
 
@@ -99,21 +96,17 @@ describe('malla-proyectada-utils', () => {
   })
 
   test('estaAprobada detecta estado segun ultimo registro', () => {
-    const avance: Avance = [
-      { nrc: '1', period: '202410', student: '1', course: 'X', status: 'APROBADO' }
-    ]
+    const avance: Avance = [ { nrc: '1', period: '202410', student: '1', course: 'X', status: 'APROBADO' } as import('../../../src/types/avance').RegistroAvance ]
     expect((require('../../../src/lib/malla-proyectada-utils').estaAprobada)('X', avance)).toBe(true)
 
-    const avance2: Avance = [
-      { nrc: '1', period: '202410', student: '1', course: 'Y', status: 'APROBADO' },
-      { nrc: '2', period: '202520', student: '1', course: 'Y', status: 'REPROBADO' }
-    ]
+    const avance2: Avance = [ { nrc: '1', period: '202410', student: '1', course: 'Y', status: 'APROBADO' } as import('../../../src/types/avance').RegistroAvance,
+      { nrc: '2', period: '202520', student: '1', course: 'Y', status: 'REPROBADO' } as import('../../../src/types/avance').RegistroAvance ]
     expect((require('../../../src/lib/malla-proyectada-utils').estaAprobada)('Y', avance2)).toBe(false)
   })
 
   test('obtenerAsignaturasCompletadas combina aprobadas y proyectadas', () => {
     const aprobadas = new Set(['A'])
-    const sems: any = [{ numero: 1, asignaturas: [{ codigo: 'B', asignatura: 'B', creditos: 6 }], creditos: 6 }]
+    const sems: any = [{ numero: 1, asignaturas: [{ codigo: 'B', asignatura: 'B', creditos: 6, nivel: 1 }], creditos: 6 }]
     const comp = (require('../../../src/lib/malla-proyectada-utils').obtenerAsignaturasCompletadas)(aprobadas, sems)
     expect(comp.has('A')).toBe(true)
     expect(comp.has('B')).toBe(true)
@@ -122,36 +115,34 @@ describe('malla-proyectada-utils', () => {
   test('prerrequisitosCumplidos retorna false cuando faltan prereqs', () => {
     const aprobadas = new Set<string>()
     const sems: any = [{ numero: 1, asignaturas: [], creditos: 0 }]
-    const asign: AsignaturaMalla = { codigo: 'D', asignatura: 'D', creditos: 6, prereq: 'Z' }
+    const asign: AsignaturaMalla = { codigo: 'D', asignatura: 'D', creditos: 6, prereq: 'Z', nivel: 1 }
     const ok = (require('../../../src/lib/malla-proyectada-utils').prerrequisitosCumplidos)(asign as any, aprobadas, sems)
     expect(ok).toBe(false)
   })
 
   test('calcularCreditosSemestre suma correctamente', () => {
     const c = (require('../../../src/lib/malla-proyectada-utils').calcularCreditosSemestre)([
-      { codigo: 'A', asignatura: 'A', creditos: 5 },
-      { codigo: 'B', asignatura: 'B', creditos: 7 }
+      { codigo: 'A', asignatura: 'A', creditos: 5, nivel: 1 },
+      { codigo: 'B', asignatura: 'B', creditos: 7, nivel: 1 }
     ] as any)
     expect(c).toBe(12)
   })
 
   test('estaEnAlertaAcademica detecta alerta', () => {
-    const avance: Avance = [
-      { nrc: '1', period: '202410', student: '1', course: 'Z', status: 'REPROBADO' },
-      { nrc: '2', period: '202520', student: '1', course: 'Z', status: 'REPROBADO' },
-      { nrc: '3', period: '202610', student: '1', course: 'Z', status: 'REPROBADO' }
-    ]
+    const avance: Avance = [ { nrc: '1', period: '202410', student: '1', course: 'Z', status: 'REPROBADO' } as import('../../../src/types/avance').RegistroAvance,
+      { nrc: '2', period: '202520', student: '1', course: 'Z', status: 'REPROBADO' } as import('../../../src/types/avance').RegistroAvance,
+      { nrc: '3', period: '202610', student: '1', course: 'Z', status: 'REPROBADO' } as import('../../../src/types/avance').RegistroAvance ]
     const res = (require('../../../src/lib/malla-proyectada-utils').estaEnAlertaAcademica)(avance)
     expect(res).toBe(true)
   })
 
   test('validarSemestre valido pasa con >=12 creditos', () => {
-    const sem: any = { asignaturas: [{ codigo: 'A', creditos: 6 }, { codigo: 'B', creditos: 6 }], creditos: 12 }
+    const sem: any = { asignaturas: [{ codigo: 'A', creditos: 6, nivel: 1 }, { codigo: 'B', creditos: 6, nivel: 1 }], creditos: 12 }
     expect(validarSemestre(sem, 30).valido).toBe(true)
   })
 
   test('puedeCrearNuevoSemestre con semestre valido permite crearlo (>=12 créditos)', () => {
-    const sems: any = [{ numero: 1, asignaturas: [{ codigo: 'A', creditos: 6 }, { codigo: 'B', creditos: 6 }], creditos: 12 }]
+    const sems: any = [{ numero: 1, asignaturas: [{ codigo: 'A', creditos: 6, nivel: 1 }, { codigo: 'B', creditos: 6, nivel: 1 }], creditos: 12 }]
     const res = puedeCrearNuevoSemestre(sems, [])
     expect(res.puede).toBe(true)
   })
