@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, main-proyectada ]
+  pull_request:
+    branches: [ main, main-proyectada ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: |
+          cd proyecto-malla-estudiante
+          npm ci
+      - name: Run tests
+        run: |
+          cd proyecto-malla-estudiante
+          npm test
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: proyecto-malla-estudiante/coverage

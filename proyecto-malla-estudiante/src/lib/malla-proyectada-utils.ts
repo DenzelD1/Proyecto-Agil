@@ -15,7 +15,7 @@ export interface ProyeccionMalla {
 /**
  * Determina si una asignatura está aprobada
  */
-function estaAprobada(codigo: string, avance: Avance): boolean {
+export function estaAprobada(codigo: string, avance: Avance): boolean {
   const registros = avance
     .filter(reg => reg.course === codigo)
     .sort((a, b) => parseInt(a.period) - parseInt(b.period))
@@ -119,7 +119,7 @@ export function prerrequisitosCumplenEnSemestre(
 /**
  * Obtiene todas las asignaturas que están aprobadas o proyectadas
  */
-function obtenerAsignaturasCompletadas(
+export function obtenerAsignaturasCompletadas(
   aprobadas: Set<string>,
   semestresProyectados: SemestreProyectado[]
 ): Set<string> {
@@ -138,7 +138,7 @@ function obtenerAsignaturasCompletadas(
 /**
  * Verifica si los prerrequisitos están cumplidos
  */
-function prerrequisitosCumplidos(
+export function prerrequisitosCumplidos(
   asignatura: AsignaturaMalla,
   aprobadas: Set<string>,
   semestresProyectados: SemestreProyectado[]
