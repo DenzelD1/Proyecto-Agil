@@ -31,14 +31,63 @@ function estaAprobada(codigo: string, avance: Avance): boolean {
  * Obtiene las asignaturas aprobadas
  */
 export function obtenerAsignaturasAprobadas(avance: Avance): Set<string> {
-  const aprobadas = new Set<string>()
+  const ultimaPorCurso = new Map<string, any>()
+
   for (const registro of avance) {
-    const statusNormalizado = registro.status.toUpperCase()
+    const codigo = registro.course
+    const periodo = parseInt(registro.period || '0')
+    const existente = ultimaPorCurso.get(codigo)
+    if (!existente || periodo >= parseInt(existente.period || '0')) {
+      ultimaPorCurso.set(codigo, registro)
+    }
+  }
+
+  const aprobadas = new Set<string>()
+  for (const registro of ultimaPorCurso.values()) {
+    const statusNormalizado = (registro.status || '').toUpperCase()
     if (statusNormalizado.includes('APROB')) {
       aprobadas.add(registro.course)
     }
   }
+
   return aprobadas
+}
+
+/**
+ * Obtiene las asignaturas que deben considerarse completadas para efectos
+ * de prerrequisitos: las aprobadas y las inscritas actualmente (status 'INSCRITO'
+ * con `excluded: false`).
+ */
+export function obtenerAsignaturasAprobadasEInscritas(avance: Avance): Set<string> {
+  const ultimaPorCurso = new Map<string, any>()
+
+  for (const registro of avance) {
+    const codigo = registro.course
+    const periodo = parseInt(registro.period || '0')
+    const existente = ultimaPorCurso.get(codigo)
+    if (!existente || periodo >= parseInt(existente.period || '0')) {
+      ultimaPorCurso.set(codigo, registro)
+    }
+  }
+
+  const completadas = new Set<string>()
+
+  for (const registro of ultimaPorCurso.values()) {
+    const status = (registro.status || '').toUpperCase()
+    if (status.includes('APROB')) {
+      completadas.add(registro.course)
+      continue
+    }
+
+    if (status.includes('INSCRITO')) {
+      // Considerar inscrito solo si excluded === false (está cursando actualmente)
+      if ((registro as any).excluded === false) {
+        completadas.add(registro.course)
+      }
+    }
+  }
+
+  return completadas
 }
 
 export function prerrequisitosCumplenEnSemestre(
@@ -117,11 +166,19 @@ export function calcularAsignaturasDisponibles(
   avance: Avance,
   semestresProyectados: SemestreProyectado[]
 ): AsignaturaMalla[] {
+  // Para calcular disponibilidad, tratamos como "completadas" las asignaturas
+  // aprobadas y las inscritas actualmente (excluded:false). Sin embargo, las
+  // inscritas NO deben aparecer como disponibles en la lista.
+  const completadasParaPrereq = obtenerAsignaturasAprobadasEInscritas(avance)
   const aprobadas = obtenerAsignaturasAprobadas(avance)
   
   return malla.filter(asignatura => {
-    // No incluir si ya está aprobada
+    // No incluir si ya está aprobada o si está inscrita actualmente (excluded:false)
     if (aprobadas.has(asignatura.codigo)) return false
+
+    // Si está en completadasParaPrereq pero no en `aprobadas`, significa que
+    // está inscrita (excluded:false) — no debe mostrarse en la lista disponible.
+    if (completadasParaPrereq.has(asignatura.codigo) && !aprobadas.has(asignatura.codigo)) return false
     
     // No incluir si ya está en algún semestre proyectado
     const yaProyectada = semestresProyectados.some(semestre =>
@@ -129,8 +186,8 @@ export function calcularAsignaturasDisponibles(
     )
     if (yaProyectada) return false
     
-    // Verificar prerrequisitos
-    return prerrequisitosCumplidos(asignatura, aprobadas, semestresProyectados)
+    // Verificar prerrequisitos usando el conjunto completado (aprobadas + inscritas)
+    return prerrequisitosCumplidos(asignatura, completadasParaPrereq, semestresProyectados)
   })
 }
 

@@ -17,6 +17,7 @@ import {
   calcularCreditosSemestre,
   obtenerMaximoCreditos,
   obtenerAsignaturasAprobadas,
+  obtenerAsignaturasAprobadasEInscritas,
   validarSemestre,
   puedeCrearNuevoSemestre,
   estaEnAlertaAcademica,
@@ -362,8 +363,8 @@ export default function MallaProyectadaPage() {
       return
     }
 
-    const aprobadas = obtenerAsignaturasAprobadas(avance)
-    const { cumplen, faltantes } = prerrequisitosCumplenEnSemestre(asignaturaArrastrando, aprobadas, semestresProyectados, semestreNumero)
+    const aprobadasYInscritas = obtenerAsignaturasAprobadasEInscritas(avance)
+    const { cumplen, faltantes } = prerrequisitosCumplenEnSemestre(asignaturaArrastrando, aprobadasYInscritas, semestresProyectados, semestreNumero)
 
     if (!cumplen) {
       alert('No puede ubicar una asignatura en un semestre donde se encuentran sus prerrequisitos. Debe establecerlo en algún semestre posterior.')

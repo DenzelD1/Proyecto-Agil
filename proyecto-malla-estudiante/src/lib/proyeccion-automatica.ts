@@ -1,7 +1,7 @@
 import { AsignaturaMalla, MallaCarrera } from "@/types/malla"
 import { Avance } from "@/types/avance"
 import { SemestreProyectado } from "./malla-proyectada-utils"
-import { obtenerAsignaturasAprobadas, obtenerMaximoCreditos, calcularCreditosSemestre } from "./malla-proyectada-utils"
+import { obtenerAsignaturasAprobadas, obtenerAsignaturasAprobadasEInscritas, obtenerMaximoCreditos, calcularCreditosSemestre } from "./malla-proyectada-utils"
 
 const MIN_CREDITOS_SEMESTRE = 12
 
@@ -10,7 +10,7 @@ function obtenerAsignaturasPendientes(
   avance: Avance,
   semestresProyectados: SemestreProyectado[]
 ): AsignaturaMalla[] {
-  const aprobadas = obtenerAsignaturasAprobadas(avance)
+  const aprobadas = obtenerAsignaturasAprobadasEInscritas(avance)
   const proyectadas = new Set<string>()
   
   for (const semestre of semestresProyectados) {
@@ -243,7 +243,7 @@ export function proyectarEgresoAutomatico(
   }
   
   const grafo = construirGrafoDependencias(asignaturasPendientes, malla)
-  const aprobadas = obtenerAsignaturasAprobadas(avance)
+  const aprobadas = obtenerAsignaturasAprobadasEInscritas(avance)
   
   const niveles = calcularNivelesProfundidad(
     asignaturasPendientes, 
