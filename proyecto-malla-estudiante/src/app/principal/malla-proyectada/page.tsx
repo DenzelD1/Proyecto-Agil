@@ -16,9 +16,11 @@ import {
   calcularAsignaturasDisponibles,
   calcularCreditosSemestre,
   obtenerMaximoCreditos,
+  obtenerAsignaturasAprobadas,
   validarSemestre,
   puedeCrearNuevoSemestre,
   estaEnAlertaAcademica,
+  prerrequisitosCumplenEnSemestre,
   SemestreProyectado
 } from "@/lib/malla-proyectada-utils"
 import { proyectarEgresoAutomatico } from "@/lib/proyeccion-automatica"
@@ -360,6 +362,15 @@ export default function MallaProyectadaPage() {
       return
     }
 
+    const aprobadas = obtenerAsignaturasAprobadas(avance)
+    const { cumplen, faltantes } = prerrequisitosCumplenEnSemestre(asignaturaArrastrando, aprobadas, semestresProyectados, semestreNumero)
+
+    if (!cumplen) {
+      alert('No puede ubicar una asignatura en un semestre donde se encuentran sus prerrequisitos. Debe establecerlo en algún semestre posterior.')
+      setAsignaturaArrastrando(null)
+      return
+    }
+
     setSemestresProyectados(prev => {
       const nuevo = [...prev]
       const indice = nuevo.findIndex(s => s.numero === semestreNumero)
@@ -406,25 +417,6 @@ export default function MallaProyectadaPage() {
   }
 
   const agregarNuevoSemestre = () => {
-    if (tieneCambiosSinGuardar && tieneAsignaturas && !proyeccionActual) {
-      setAccionPendiente(() => () => {
-        const validacion = puedeCrearNuevoSemestre(semestresProyectados, avance)
-        if (!validacion.puede) {
-          alert(validacion.error)
-          return
-        }
-        const nuevoNumero = semestresProyectados.length > 0
-          ? Math.max(...semestresProyectados.map(s => s.numero)) + 1
-          : 1
-        setSemestresProyectados(prev => [
-          ...prev,
-          { numero: nuevoNumero, asignaturas: [], creditos: 0 }
-        ])
-      })
-      setMostrarModalAdvertencia(true)
-      return
-    }
-
     const validacion = puedeCrearNuevoSemestre(semestresProyectados, avance)
     if (!validacion.puede) {
       alert(validacion.error)

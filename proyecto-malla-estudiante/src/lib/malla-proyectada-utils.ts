@@ -41,6 +41,32 @@ export function obtenerAsignaturasAprobadas(avance: Avance): Set<string> {
   return aprobadas
 }
 
+export function prerrequisitosCumplenEnSemestre(
+  asignatura: AsignaturaMalla,
+  aprobadas: Set<string>,
+  semestresProyectados: SemestreProyectado[],
+  semestreNumero: number
+): { cumplen: boolean; faltantes: string[] } {
+  if (!asignatura.prereq) return { cumplen: true, faltantes: [] }
+
+  const prereqs = asignatura.prereq.split(',').map(p => p.trim())
+  const faltantes: string[] = []
+
+  for (const prereq of prereqs) {
+    if (aprobadas.has(prereq)) continue
+
+    const encontrado = semestresProyectados.find(s =>
+      s.asignaturas.some(a => a.codigo === prereq && s.numero < semestreNumero)
+    )
+
+    if (!encontrado) {
+      faltantes.push(prereq)
+    }
+  }
+
+  return { cumplen: faltantes.length === 0, faltantes }
+}
+
 /**
  * Obtiene todas las asignaturas que están aprobadas o proyectadas
  */
