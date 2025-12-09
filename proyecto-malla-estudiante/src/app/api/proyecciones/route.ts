@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { SemestreProyectado } from '@/lib/malla-proyectada-utils'
+import { ProyeccionMalla } from '@prisma/client'
 
 export interface ProyeccionGuardada {
   id: number
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const proyeccionesFormateadas: ProyeccionGuardada[] = proyecciones.map(p => ({
+    const proyeccionesFormateadas: ProyeccionGuardada[] = proyecciones.map((p: ProyeccionMalla) => ({
       id: p.id,
       rut: p.rut,
       codigoCarrera: p.codigoCarrera,
