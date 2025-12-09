@@ -54,7 +54,7 @@ export default function PrincipalPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">
-            Bienvenido al Sistema Académico Totoralillo 3
+            Bienvenido al Sistema de Avance y Visualización Estudiantil
           </h1>
           <p className="text-slate-600">
             Visualiza o gestiona tu información académica y planifica tu futuro profesional
