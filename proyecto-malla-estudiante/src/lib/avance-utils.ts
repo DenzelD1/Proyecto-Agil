@@ -20,38 +20,57 @@ function normalizarEstado(estado: string): 'APROBADO' | 'REPROBADO' | 'OTRO' {
 }
 
 export function verificarAlertaAcademica(avance: Avance): 'Normal' | 'Alerta Académica' {
-  const intentosPorCurso: Map<string, number> = new Map()
-  const reprobadosPorSemestre: Map<string, string[]> = new Map()
+  const avanceOrdenado = [...avance].sort((a, b) => parseInt(a.period) - parseInt(b.period))
 
-  const avanceOrdenado = [...avance].sort((a, b) => parseInt(a.period) - parseInt(b.period));
+  // intentosPorCurso: cuenta de reprobs por curso (incluye duplicados si el mismo curso aparece varias veces)
+  const intentosPorCurso: Map<string, number> = new Map()
+  // reprobadosPorSemestre: lista (con duplicados) de cursos reprobados por periodo
+  const reprobadosPorSemestre: Map<string, string[]> = new Map()
+  // registrosPorCurso para determinar estado final por curso
+  const registrosPorCurso: Map<string, RegistroAvance[]> = new Map()
 
   for (const reg of avanceOrdenado) {
+    const lista = registrosPorCurso.get(reg.course) || []
+    lista.push(reg)
+    registrosPorCurso.set(reg.course, lista)
+
     const estado = normalizarEstado(reg.status)
-    if (estado !== 'REPROBADO') continue;
-
-    const conteoActual = intentosPorCurso.get(reg.course) || 0;
-    intentosPorCurso.set(reg.course, conteoActual + 1);
-
-    if (intentosPorCurso.get(reg.course) === 3) {
-      return 'Alerta Académica';
+    if (estado === 'REPROBADO') {
+      intentosPorCurso.set(reg.course, (intentosPorCurso.get(reg.course) || 0) + 1)
+      const arr = reprobadosPorSemestre.get(reg.period) || []
+      arr.push(reg.course)
+      reprobadosPorSemestre.set(reg.period, arr)
     }
-
-    if (!reprobadosPorSemestre.has(reg.period)) {
-      reprobadosPorSemestre.set(reg.period, []);
-    }
-    reprobadosPorSemestre.get(reg.period)!.push(reg.course);
   }
 
+  // Primero: si algún curso que actualmente NO está aprobado acumula >=3 reprobs -> alerta
+  for (const [curso, registros] of registrosPorCurso.entries()) {
+    const ultimo = registros[registros.length - 1]
+    const estadoFinal = ultimo ? normalizarEstado(ultimo.status) : 'OTRO'
+
+    if (estadoFinal === 'APROBADO') continue
+
+    const reprobs = intentosPorCurso.get(curso) || 0
+    if (reprobs >= 3) return 'Alerta Académica'
+  }
+
+  // Segundo: evaluar reprobados por semestre (se cuentan duplicados como en la lógica original)
   for (const reprobados of reprobadosPorSemestre.values()) {
     if (reprobados.length >= 2) {
-      const enSegundaOportunidad = reprobados.filter(curso => intentosPorCurso.get(curso) === 2).length;
-      if (enSegundaOportunidad >= 2) {
-        return 'Alerta Académica';
-      }
+      const enSegundaOportunidad = reprobados.filter(curso => {
+        const reprobs = intentosPorCurso.get(curso) || 0
+        const registros = registrosPorCurso.get(curso) || []
+        const ultimo = registros[registros.length - 1]
+        const estadoFinal = ultimo ? normalizarEstado(ultimo.status) : 'OTRO'
+        // solo contar si el curso tiene exactamente 2 reprobs y no fue aprobado al final
+        return reprobs === 2 && estadoFinal !== 'APROBADO'
+      }).length
+
+      if (enSegundaOportunidad >= 2) return 'Alerta Académica'
     }
   }
 
-  return 'Normal';
+  return 'Normal'
 }
 
 
